@@ -1,42 +1,82 @@
 <!DOCTYPE html>
-<head>
-  <meta charset="utf-8">
-  <script src="//d3js.org/d3.v4.js"></script>
-  <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
-  <style>
-    body { margin:0;position:fixed;top:0;right:0;bottom:0;left:0; }
-    svg { width:100%; height: 100% }
-  </style>
-</head>
+<html>
+<meta charset="utf-8">
+<title>earthquakes</title>
+
+<style>
+html,body{
+  margin:0;
+}
+svg {
+  background-color: #fff;
+  }
+
+path.earthquake, circle.earthquake {
+  fill: #4EC07F;
+  fill-opacity: 0.5;
+}
+.tooltip {
+  position: absolute;
+  padding: 15px;
+  font: 12px sans-serif;
+  background: #222;
+  color: #fff;
+  border: 0px;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0.8;
+  visibility: hidden;
+}
+</style>
+<script src="//d3js.org/d3.v4.min.js"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
 
 <body>
   <script>
-    var width = window.innerWidth;
-    var height = window.innerHeight;
 
-    var svg = d3.select("body").append("svg")
+  var pi = Math.PI,
+      tau = 2 * pi;
 
+  var width = window.innerWidth;
+  var height = window.innerHeight;
 
-//d3.geoAzimuthalEqualArea()
-    var projection = d3.geoStereographic()
-      .scale(width / 2 / Math.PI)
-      .scale(200)
-      .translate([width / 3, height / 2])
+  var projection = d3.geoStereographic()
+  .scale(1 / tau)
+  .translate([0, 0]);
 
-    var path = d3.geoPath()
-      .projection(projection);
+  var path = d3.geoPath()
+              .projection(projection);
 
-    var url = "http://enjalot.github.io/wwsd/data/world/world-110m.geojson";
-    d3.json(url, function(err, world_geojson) {
-      d3.tsv("plants.tsv", function(err, places) {
-      svg.append("path")
-        .attr("d", path(world_geojson))
-      .attr("fill","lightgray")
+  var zoom = d3.zoom()
+      .scaleExtent([1 << 2, 1 << 24])
+      .on("zoom", zoomed);
 
-     svg.selectAll("circle")
-     .data(places)
+  var svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height)
+
+  var layer1 = svg.append("g");
+  var layer2 = svg.append("g");
+
+  var center = projection([-90.443445,37.757074]);
+
+    d3.json("world-110m.json", function(error, world) {
+      d3.tsv("plants.tsv", function(error, places) {
+
+      if (error) throw error;
+
+      layer1.selectAll("path")
+          .data(world.features)
+        .enter().append("path")
+          .attr("d", path)
+          .attr("class", "world")
+          .attr("fill","lightgray")
+
+    var point = layer2.selectAll('circle')
+    .data(places)
      .enter()
      .append("circle")
+     .attr('class', 'plant')
      .attr("r", function(d){
        return Math.floor(Math.random()*(9-2+1)+2);
      })
@@ -46,13 +86,53 @@
       if(d.plant == "sage"){return "darkgreen"}
       else if (d.plant == "lavender"){return "purple"}
      })
-
     .attr("opacity",0.4)
-      })
+    .on("mouseover", function(d) {
+      if (d.month != "" && d.day != "" && d.year != ""){
+        var tooltip_str = d.month + "/" + d.day + "/" + d.year + "<br/>" + d.plant
+      }else{
+        var tooltip_str = d.plant
+      }
+      tooltip.html(tooltip_str)
+          .style("visibility", "visible");
+    })
+    .on("mousemove", function(d) {
+      tooltip.style("top", event.pageY - (tooltip.node().clientHeight + 5) + "px")
+          .style("left", event.pageX - (tooltip.node().clientWidth / 2.0) + "px");
+    })
+    .on("mouseout", function(d) {
+      tooltip.style("visibility", "hidden");
     })
 
-    function randomIntFromInterval(min,max){
+    var tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip");
 
-    }
+  }) // end tsv
+  }); // end json
+
+  svg
+      .call(zoom)
+      .call(zoom.transform, d3.zoomIdentity
+          .translate(width / 3, height / 2)
+          .scale(1 << 11)
+          .translate(-center[0], -center[1]));
+
+
+function zoomed() {
+  var transform = d3.event.transform;
+
+  projection
+      .scale(transform.k / tau)
+      .translate([transform.x, transform.y]);
+
+  layer1.selectAll('path')
+  .attr("d", path)
+
+  layer2.selectAll('.plant')
+  .attr("cx", function(d) {return projection([d.y,d.x])[0]})
+  .attr("cy", function(d) {return projection([d.y,d.x])[1]})
+
+}
   </script>
 </body>
+</html>
